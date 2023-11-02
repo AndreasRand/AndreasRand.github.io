@@ -1,0 +1,338 @@
+<!doctype html>
+<html>
+<head>
+    <title>GraphQL</title>
+    <script src="https://unpkg.com/frappe-charts@latest"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+        }
+        .card {
+            width: 25%; /* Adjust the width as needed */
+            margin: 1%;
+            padding: 10px;
+            text-align: center;
+            display: inline-block; /* Display cards in a row */
+            background: #fff;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .container {
+            display: flex;
+            justify-content: space-evenly;
+        }
+        .dropdown-container{
+            background: #fff;
+            position: fixed;
+            right: 10px;
+            border: 1px solid #ccc;
+            height: 32px;
+            border-radius: 5px;
+            cursor: pointer;
+            direction: rtl;
+        }
+        .dropdown-content {
+            display: none;
+            align-items: center;
+            position: absolute;
+            background-color: #f9f9f9;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            border-radius: 5px;
+            padding: 10px;
+            z-index: 1;
+        }
+        .dropdown-content p {
+            margin: 0;
+        }
+        .dropdown-content:hover {
+            background: #e9e9e9;
+        }
+        .chart {
+            background: #fff;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .content {
+            height: calc(100vh - 16px);
+        }
+        .login-box {
+            width: 300px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .login-box h2 {
+            text-align: center;
+        }
+        
+        .login-box .input-container {
+            margin: 20px 0px;
+        }
+        
+        .login-box label {
+            display: block;
+            font-weight: bold;
+        }
+        
+        .login-box input[type="text"],
+        .login-box input[type="password"] {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        
+        .login-box button {
+            background: #007BFF;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        .login-box button:hover {
+            background: #0056b3;
+        }
+
+        .error {
+            display: none;
+            color: red;
+            margin-bottom: 10px;
+        }
+        .index {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <h2>Login</h2>
+        <div class="input-container">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" required>
+        </div>
+
+        <div class="input-container">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+        <div class="error">
+            Invalid credentials
+        </div>
+        <button onclick="login()">Login</button>
+    </div>
+    <div class="index">
+        <div class="dropdown-container">
+            <img src="./static/images/menu.svg"/>
+            <div class="dropdown-content" onclick="logout()">
+                <img src="./static/images/logout.svg" />
+                <p style="display: inline-block; margin-right: 5px;">Logout</p>
+            </div>
+        </div>
+        <div class="content">
+            <div class="container">
+                <div class="card">
+                    <h2 id="login"></h2>
+                    <p id="email"></p>
+                </div>
+            
+                <div class="card">
+                    <h2>Div 01 XP</h2>
+                    <p id="xpview"></p>
+                </div>
+            
+                <div class="card">
+                    <h2>Audit ratio</h2>
+                    <p id="auditsDone">Done: </p>
+                    <p id="auditsReceived">Received: </p>
+                </div>
+            </div>
+            <div id="chart1" class="chart"></div>
+            <div id="chart2" class="chart"></div>
+        </div>
+    </div>
+</body>
+<script>
+    function login() {
+        fetch("https://01.kood.tech/api/auth/signin", {
+            method: "POST",
+            headers: {
+                "Authorization": 'Basic ' + btoa(document.getElementById('username').value + ":" + document.getElementById('password').value),
+            }
+        }).then((response) => response.json())
+        .then(async (text) => {
+            if (text.error) return document.querySelector('.error').style.display = 'block';
+            document.cookie = "jwt="+text;
+            window.location.reload();
+        })
+    }
+    function logout() {
+        document.cookie = "jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+        window.location.reload();
+    }
+    var JWT = document.cookie ? document.cookie.split('; ').find(s => s.match(/jwt=/)).replace("jwt=", "") : null;
+    if (JWT) {
+        document.querySelector('.index').style.display = 'block';
+        document.querySelector('.login-box').style.display = 'none';
+        fetch("https://01.kood.tech/api/graphql-engine/v1/graphql", {
+            method: "POST",
+            body: JSON.stringify({
+                query: `
+                    {
+                        user {
+                            login
+                            email
+                        }
+                    }
+                `
+            }),
+            headers: {
+                "Authorization": "Bearer " + JWT
+            }
+        }).then((response) => response.json())
+        .then((text) => {
+            if (text.errors) logout();
+            document.getElementById('login').innerHTML = text.data.user[0].login;
+            document.getElementById('email').innerHTML = text.data.user[0].email;
+        });
+        fetch("https://01.kood.tech/api/graphql-engine/v1/graphql", {
+            method: "POST",
+            body: JSON.stringify({
+                query: `
+                    {
+                        transaction_aggregate (where: {eventId: {_eq: 85}, type: {_eq: "xp"}}) {
+                            aggregate {
+                                sum {
+                                    amount
+                                }
+                            }
+                        }
+                    }
+                `
+            }),
+            headers: {
+                "Authorization": "Bearer " + JWT
+            }
+        }).then((response) => response.json())
+        .then((text) => {
+            document.getElementById('xpview').innerHTML = text.data.transaction_aggregate.aggregate.sum.amount + ' bytes';
+        });
+        fetch("https://01.kood.tech/api/graphql-engine/v1/graphql", {
+            method: "POST",
+            body: JSON.stringify({
+                query: `
+                    {
+                        transaction_aggregate (where: {type: {_eq: "up"}}) {
+                            aggregate {
+                                sum {
+                                    amount
+                                }
+                            }
+                        }
+                    }
+                `
+            }),
+            headers: {
+                "Authorization": "Bearer " + JWT
+            }
+        }).then((response) => response.json())
+        .then((text) => {
+            document.getElementById('auditsDone').innerHTML += text.data.transaction_aggregate.aggregate.sum.amount + ' bytes';
+        });
+        fetch("https://01.kood.tech/api/graphql-engine/v1/graphql", {
+            method: "POST",
+            body: JSON.stringify({
+                query: `
+                    {
+                        transaction_aggregate (where: {type: {_eq: "down"}}) {
+                            aggregate {
+                                sum {
+                                    amount
+                                }
+                            }
+                        }
+                    }
+                `
+            }),
+            headers: {
+                "Authorization": "Bearer " + JWT
+            }
+        }).then((response) => response.json())
+        .then((text) => {
+            document.getElementById('auditsReceived').innerHTML += text.data.transaction_aggregate.aggregate.sum.amount + ' bytes';
+        });
+        fetch("https://01.kood.tech/api/graphql-engine/v1/graphql", {
+            method: "POST",
+            body: JSON.stringify({
+                query: `
+                    {
+                        transaction(where: {eventId: {_eq: 85}, type: {_eq: "xp"}}, order_by: {createdAt: asc}) {
+                            createdAt
+                            amount
+                            object{
+                                name
+                            }
+                        }
+                    }
+                `
+            }),
+            headers: {
+                "Authorization": "Bearer " + JWT
+            }
+        }).then((response) => response.json())
+        .then((text) => {
+            let xp = 0;
+            const data1 = {
+                labels: text.data.transaction.map(s => s.object.name),
+                datasets: [
+                    {
+                        name: "XP by Div 01 projects", type: "bar",
+                        values: text.data.transaction.map(s => s.amount)
+                    },
+                ]
+            }
+            let resultMap = text.data.transaction.reduce((map, obj) => map.set(new Date(obj.createdAt).toLocaleDateString('default', {month: 'long', year: 'numeric'}), (map.get(new Date(obj.createdAt).toLocaleDateString('default', {month: 'long', year: 'numeric'})) || 0) + obj.amount), new Map());
+            for (let start = new Date(new Date(new Date(text.data.transaction[0].createdAt).toLocaleDateString()).setDate(1)); start <= new Date(text.data.transaction[text.data.transaction.length-1].createdAt);start.setMonth(start.getMonth()+1)) {
+                !(resultMap.has(start.toLocaleDateString('default', {month: 'long', year: 'numeric'}))) && (resultMap.set(start.toLocaleDateString('default', {month: 'long', year: 'numeric'}), 0))
+            }
+            resultMap = new Map(Array.from(resultMap).sort((a, b) => new Date(a[0]) - new Date(b[0])))
+            const data2 = {
+                labels: Array.from(resultMap.keys()),
+                datasets: [
+                    {
+                        name: "XP progression over time", type: "line",
+                        values: Array.from(resultMap.values()).map(s => {xp += s; return xp})
+                    },
+                ]
+            }
+
+            const chart = new frappe.Chart("#chart1", {
+                title: "XP by Div 01 projects",
+                data: data1,
+                type: 'bar',
+                height: document.documentElement.clientHeight * 0.33,
+                colors: ['#7cd6fd', '#743ee2']
+            })
+            const chart2 = new frappe.Chart("#chart2", {
+                title: "XP progression over time",
+                data: data2,
+                type: 'line',
+                height: document.documentElement.clientHeight * 0.33,
+                colors: ['#7cd6fd', '#743ee2']
+            })
+        });
+        document.querySelector(".dropdown-container").addEventListener('click', () => {
+            document.querySelector(".dropdown-content").style.display = document.querySelector(".dropdown-content").style.display == 'flex' ? 'none' : 'flex';
+        });
+        document.querySelector(".content").addEventListener('click', () => {
+            document.querySelector(".dropdown-content").style.display = 'none';
+        });
+    }
+</script>
+</html>
